@@ -3,6 +3,7 @@ import requests
 import discord
 import json
 import asyncio
+import datetime
 
 
 from dotenv import load_dotenv
@@ -25,6 +26,16 @@ else:
 # Initialize the bot
 bot = commands.Bot(command_prefix=";", intents=discord.Intents.all())
 
+
+# Function to generate the embed with current time
+def generate_time_embed():
+    # Get current time
+    current_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    
+    # Create an embed
+    #embed = discord.Embed(title="Current Time", description=f"The current time is: {current_time}", color=discord.Color.blue())
+    
+    return current_time
 
 # Define a function to fetch data from the API
 def fetch_data_from_api(endpoint):
@@ -98,7 +109,7 @@ async def sync(ctx):
     else:
         await ctx.send('You must be the owner to use this command!')
 
-previous_embed_content = None
+previous_message = None
 
 #define embed content
 def generate_content():
@@ -133,32 +144,46 @@ def generate_content():
                 embed.add_field(name="", value=" ", inline=False)
 
         
-        embed.add_field(name="D-0 of the first Galactic War:", value=fetch_data_from_api("/api/801/info")['start_date'], inline=True)
+        embed.add_field(name="Updated:", value=generate_time_embed(), inline=True)
+        print(f"Updated: {generate_time_embed()}")
         #embed.add_field(name="War ID of the first Galactic War:", value=fetch_data_from_api("/api/801/info")['war_id'], inline=True)
         
         return embed
 
 print("DEBUG: loop task")
-@tasks.loop(minutes=2)
-async def check_for_updates():
-    global previous_embed_content
+@tasks.loop(minutes=6)
+async def check_for_updates(channel_id):
+    try:
+        global previous_message
     
-    print("Console: check_for_updates")
+        # Get the channel object
+        channel = bot.get_channel(channel_id)
+        if channel is None:
+            print(f"Error: Channel with ID {channel_id} not found.")
+            return
     
-    current_embed_content = generate_content()
+        # Generate the current embed content
+        current_embed_content = generate_content()
     
-    if current_embed_content != previous_embed_content:
-        print("Console: current_embed_content != previous_embed_content")
-        print("Console: update gets pushed")
-        # Push the updated embed to the channel
-        channel = bot.get_channel(channelid)
-        await channel.send(embed=current_embed_content)
-        print("Console: success pushing update")
-        
-        # Update the previous embed content
-        previous_embed_content = current_embed_content
-        print("Console: Update the previous embed content -> success")
-    
+        # Check if there's a previous message to edit
+        if previous_message:
+            # Edit the previous message with the updated embed
+            try:
+                await previous_message.edit(embed=current_embed_content)
+                print("Console: Updated [Current War Intel]")
+            except discord.NotFound:
+                print("Error: Previous message not found.")
+            except discord.Forbidden:
+                print("Error: Bot does not have permission to edit the message.")
+        else:
+            # Send a new message with the embed and store it as the previous message
+            try:
+                previous_message = await channel.send(embed=current_embed_content)
+            except discord.Forbidden:
+                print("Error: Bot does not have permission to send messages in this channel.")
+    except:
+        print("DEBUG: ERROR in checkforupdates")
+        pass
 
 # Slash command to retrieve status from the API
 @bot.tree.command(name="warstatus", description="Fetch War Status")
@@ -195,7 +220,9 @@ async def warstatus(interaction: discord.Interaction):
                         embed.add_field(name="", value=" ", inline=False)
 
         
-            embed.add_field(name="D-0 of the first Galactic War:", value=fetch_data_from_api("/api/801/info")['start_date'], inline=True)
+            embed.add_field(name="Updated:", value=generate_time_embed(), inline=True)
+            print(f"Updated: {generate_time_embed()}")
+            #embed.add_field(name="D-0 of the first Galactic War:", value=fetch_data_from_api("/api/801/info")['start_date'], inline=True)
             #embed.add_field(name="War ID of the first Galactic War:", value=fetch_data_from_api("/api/801/info")['war_id'], inline=True)
             
             await interaction.response.send_message(embed=embed)
@@ -212,7 +239,7 @@ async def on_ready():
     print('Console: Bot is ready!')
     print("----------------------------------------------------")
     game = discord.Game("Superearth Office")
-    check_for_updates.start()
+    check_for_updates.start(channelid)
     await bot.change_presence(status=discord.Status.idle, activity=game)
 
 #load .env file / run bot
