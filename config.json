@@ -1,5 +1,16 @@
 {
   "server_id": "1214682096749252739",
-  "server_channel_id": "1214682134321831996"
+  "server_channel_id": "1214682134321831996",
+  "daemon": "250648489220898817",
+  "emojis": {
+    "attack": ":crossed_swords:",
+    "defend": ":shield:",
+    "terminid": ":ant:",
+    "automaton": ":robot:",
+    "humans": ":globe_with_meridians:"
+  },
+  "roles" : {
+    "empty" : "empty"
+  }
 }
 
