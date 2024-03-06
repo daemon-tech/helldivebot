@@ -1,7 +1,7 @@
 {
-  "server_id": "1214682096749252739",
-  "server_channel_id": "1214682134321831996",
-  "daemon": "250648489220898817",
+  "server_id": 1214682096749252739,
+  "server_channel_id": 1214682134321831996,
+  "daemon": 250648489220898817,
   "emojis": {
     "attack": ":crossed_swords:",
     "defend": ":shield:",

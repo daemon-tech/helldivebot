@@ -2,11 +2,12 @@ import os
 import requests
 import discord
 import json
+import asyncio
 
 
 from dotenv import load_dotenv
-from discord.ext import commands
 from discord import app_commands
+from discord.ext import commands, tasks
 
 #clear terminal
 os.system("clear")
@@ -79,13 +80,9 @@ def validate_war(i):
             return f"{config['emojis']['humans']} {config['emojis']['attack']}"
 
 #fetch id's from config
-channel_id = config['server_channel_id']
-server_id = config['server_id']
+channelid = config['server_channel_id']
+serverid = config['server_id']
 
-# Event handler for bot startup
-@bot.event
-async def on_ready():
-    print('Console: Bot is ready!')
 
 #command sync
 @bot.command()
@@ -100,32 +97,123 @@ async def sync(ctx):
             print(f'Error syncing commands: {e}')
     else:
         await ctx.send('You must be the owner to use this command!')
-        
-# Slash command to retrieve status from the API
-@bot.tree.command(name="warstatus", description="Fetch War Status")
-async def warstatus(interaction: discord.Interaction):
+
+previous_embed_content = None
+
+#define embed content
+def generate_content():
+    
     data = fetch_data_from_api("/api/801/status")
+    data_event = fetch_data_from_api("/api/801/events")
+        
     if data:
-        embed = discord.Embed(title=":ringed_planet: Planet Status :ringed_planet:", color=discord.Color.blue())
+        embed = discord.Embed(title=":ringed_planet: Current War Intel :ringed_planet:", color=discord.Color.blue())
+        
+        #superearth messages 
+        for i in range(0, len(data_event)):
+            embed.add_field(name=f"Superearth Message {i+1}:", value=f"{data_event[i]['message']['en']}", inline=False)
+            embed.add_field(name=" ", value=" ", inline=False)
+            
         
         # Add fields for different parts of the data
-        for i in range(len(data['planet_status'])):
+        for i in range(0, len(data['planet_status'])):
+            
             
             #var init for post if
             liberation_as_int = int(float(data['planet_status'][i]['liberation']))
             liberation_formated = "{:.2f}".format(liberation_as_int)
             players_formatted = format_players(data['planet_status'][i]['players'])
             
+            
             #check if war between 100 < target > 0
             if data['planet_status'][i]['liberation'] < 100 and data['planet_status'][i]['liberation'] > 0:
-                    embed.add_field(name="Planet:", value=f"{validate_war(i)} {data['planet_status'][i]['planet']['name']}", inline=True)
-                    embed.add_field(name="Liberation:", value=f"{liberation_formated}% ", inline=True)
-                    embed.add_field(name="Players:", value=f"{players_formatted}", inline=True)
-                    embed.add_field(name="", value=" ", inline=False)
+                embed.add_field(name="Planet:", value=f"{validate_war(i)} {data['planet_status'][i]['planet']['name']}", inline=True)
+                embed.add_field(name="Liberation:", value=f"{liberation_formated}% ", inline=True)
+                embed.add_field(name="Players:", value=f"{players_formatted}", inline=True)
+                embed.add_field(name="", value=" ", inline=False)
+
         
-        await interaction.response.send_message(embed=embed)
+        embed.add_field(name="D-0 of the first Galactic War:", value=fetch_data_from_api("/api/801/info")['start_date'], inline=True)
+        #embed.add_field(name="War ID of the first Galactic War:", value=fetch_data_from_api("/api/801/info")['war_id'], inline=True)
+        
+        return embed
+
+print("DEBUG: loop task")
+@tasks.loop(minutes=2)
+async def check_for_updates():
+    global previous_embed_content
+    
+    print("Console: check_for_updates")
+    
+    current_embed_content = generate_content()
+    
+    if current_embed_content != previous_embed_content:
+        print("Console: current_embed_content != previous_embed_content")
+        print("Console: update gets pushed")
+        # Push the updated embed to the channel
+        channel = bot.get_channel(channelid)
+        await channel.send(embed=current_embed_content)
+        print("Console: success pushing update")
+        
+        # Update the previous embed content
+        previous_embed_content = current_embed_content
+        print("Console: Update the previous embed content -> success")
+    
+
+# Slash command to retrieve status from the API
+@bot.tree.command(name="warstatus", description="Fetch War Status")
+async def warstatus(interaction: discord.Interaction):
+    if interaction.channel_id == channelid:
+        
+        data = fetch_data_from_api("/api/801/status")
+        data_event = fetch_data_from_api("/api/801/events")
+        
+        if data:
+            embed = discord.Embed(title=":ringed_planet: Current War Intel :ringed_planet:", color=discord.Color.blue())
+        
+            #superearth messages 
+            for i in range(0, len(data_event)):
+                embed.add_field(name=f"Superearth Message {i+1}:", value=f"{data_event[i]['message']['en']}", inline=False)
+                embed.add_field(name=" ", value=" ", inline=False)
+            
+        
+            # Add fields for different parts of the data
+            for i in range(0, len(data['planet_status'])):
+            
+            
+                #var init for post if
+                liberation_as_int = int(float(data['planet_status'][i]['liberation']))
+                liberation_formated = "{:.2f}".format(liberation_as_int)
+                players_formatted = format_players(data['planet_status'][i]['players'])
+            
+            
+                #check if war between 100 < target > 0
+                if data['planet_status'][i]['liberation'] < 100 and data['planet_status'][i]['liberation'] > 0:
+                        embed.add_field(name="Planet:", value=f"{validate_war(i)} {data['planet_status'][i]['planet']['name']}", inline=True)
+                        embed.add_field(name="Liberation:", value=f"{liberation_formated}% ", inline=True)
+                        embed.add_field(name="Players:", value=f"{players_formatted}", inline=True)
+                        embed.add_field(name="", value=" ", inline=False)
+
+        
+            embed.add_field(name="D-0 of the first Galactic War:", value=fetch_data_from_api("/api/801/info")['start_date'], inline=True)
+            #embed.add_field(name="War ID of the first Galactic War:", value=fetch_data_from_api("/api/801/info")['war_id'], inline=True)
+            
+            await interaction.response.send_message(embed=embed)
+            print(f"Console: interaction.response.send_message(embed=embed) -> warstatus")
+        else:
+            await interaction.response.send_message("Failed to fetch data from the API. Please wait a bit")
     else:
-        await interaction.response.send_message("Failed to fetch data from the API. Please wait a bit")
+        print(f"Console: /warstatus is not allowed to be read and pasted in current channel id: {interaction.channel_id}")
+
+
+# Event handler for bot startup
+@bot.event
+async def on_ready():
+    print('Console: Bot is ready!')
+    print("----------------------------------------------------")
+    game = discord.Game("Superearth Office")
+    check_for_updates.start()
+    await bot.change_presence(status=discord.Status.idle, activity=game)
 
 #load .env file / run bot
 load_dotenv()

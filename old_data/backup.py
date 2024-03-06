@@ -17,3 +17,10 @@ async def planetinfo(interaction: discord.Interaction):
         
         #api/801/planets/(index)/status
 '''
+
+'''
+for i in range(0, len(fetch_data_from_api("/api/801/info")['home_worlds'])):
+                for j in range(0, len(fetch_data_from_api("/api/801/info")['home_worlds'][i]['planets'])):
+                    embed.add_field(name="Homeworld", value=fetch_data_from_api("/api/801/info")['home_worlds'][i]['planets'][j]['name'], inline=True)
+                    embed.add_field(name="Race", value=fetch_data_from_api("/api/801/info")['home_worlds'][i]['race'], inline=True)
+'''
