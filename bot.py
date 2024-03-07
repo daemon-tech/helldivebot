@@ -9,6 +9,7 @@ import datetime
 from dotenv import load_dotenv
 from discord import app_commands
 from discord.ext import commands, tasks
+#from src.event_handler_log import *
 
 #clear terminal
 os.system("clear")
@@ -93,6 +94,8 @@ def validate_war(i):
 #fetch id's from config
 channelid = config['server_channel_id']
 serverid = config['server_id']
+channelalert = config['alert']
+channelhistory = config['history']
 
 
 #command sync
@@ -184,6 +187,9 @@ async def check_for_updates(channel_id):
     except:
         print("DEBUG: ERROR in checkforupdates")
         pass
+
+
+
 
 # Slash command to retrieve status from the API
 @bot.tree.command(name="warstatus", description="Fetch War Status")
