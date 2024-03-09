@@ -1,42 +1,47 @@
-import discord
-import asyncio
-import aiohttp
+import requests
 
-'''
-intents = discord.Intents.default()
-intents.guilds = True
-intents.members = True
-intents.messages = True
-'''
+url = "https://helldivers-2.fly.dev/api/801/status"
+response = requests.get(url)
+json_data = response.json()
 
-#bot = discord.Bot(intents=intents)
+def alert_for_conquered_planet():
+    conquered_events = []
 
-API_ENDPOINT = "https://helldivers-2.fly.dev/api/801/planets/{}/status"
-PLANET_IDS = [1, 2, 3]  # Replace with the actual planet IDs you want to monitor
+    # Check planet attacks
+    for attack in json_data['planet_attacks']:
+        if attack['source']['initial_owner'] != 'Humans':
+            conquered_events.append({
+                'planet': attack['target']['name'],
+                'conquering_entity': attack['source']['initial_owner'],
+                'timestamp': attack.get('timestamp', 'Unknown timestamp')
+            })
 
-# This event is triggered when the bot is ready and connected to Discord
-'''
-@bot.event
-async def on_ready():
-    print('Bot is ready.')
-    # Start polling the API for updates
-    await poll_api_for_updates()
-'''
+    # Check global events
+    for event in json_data['global_events']:
+        if event['race'] != 'Humans':
+            conquered_events.append({
+                'planet': event.get('title', 'Unknown planet'),
+                'conquering_entity': event['race'],
+                'timestamp': event.get('timestamp', 'Unknown timestamp')
+            })
 
-async def poll_api_for_updates():
-    while True:
-        await asyncio.sleep(600)  # Polling interval (e.g., every 10 minutes)
-        for planet_id in PLANET_IDS:
-            async with aiohttp.ClientSession() as session:
-                async with session.get(API_ENDPOINT.format(planet_id)) as response:
-                    if response.status == 200:
-                        data = await response.json()
-                        owner = data.get('owner', None)
-                        if owner is not None and owner != previous_owners[planet_id]:
-                            handle_planet_status_update(planet_id, owner)
-                            previous_owners[planet_id] = owner
+    # Check community targets
+    for target in json_data['community_targets']:
+        if target['race'] != 'Humans':
+            conquered_events.append({
+                'planet': target['planet'],
+                'conquering_entity': target['race'],
+                'timestamp': target.get('timestamp', 'Unknown timestamp')
+            })
 
-async def handle_planet_status_update(planet_id, new_owner):
-    # Your logic to handle planet status updates goes here
-    # Update your war log, trigger events, etc.
-    print(f"Planet {planet_id} has been conquered by {new_owner}!")
+    # If no conquered events found, return appropriate message
+    if not conquered_events:
+        return "No conquered planet found."
+
+    # Sort conquered events by timestamp (excluding "Unknown timestamp")
+    conquered_events.sort(key=lambda x: (x['timestamp'] == 'Unknown timestamp', x['timestamp']))
+
+    # Return details of the earliest conquered planet
+    earliest_event = conquered_events[0]
+    print(f"Planet {earliest_event['planet']} got conquered by {earliest_event['conquering_entity']} at {earliest_event['timestamp']}!")
+    return f"Planet {earliest_event['planet']} got conquered by {earliest_event['conquering_entity']} at {earliest_event['timestamp']}!"
