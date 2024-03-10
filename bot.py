@@ -6,6 +6,9 @@ import datetime
 
 from dotenv import load_dotenv
 from discord.ext import commands, tasks
+from src.lib_player_eff import calculate_liberation_player_efficiency
+from src.lib_player_eff import format_efficiency
+from src.calc_time_lib import calculate_time_to_liberate
 #from src.event_handler_log import *
 
 # Load configuration from config.json
@@ -61,7 +64,7 @@ def generate_time_embed():
     current_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     return current_time
 
-# Initializing for check_for_updates
+# Global variable to store the previous message
 previous_message = None
 
 # Task to check for updates and send to a channel
@@ -75,6 +78,12 @@ async def check_for_updates(channel_id):
             return
 
         current_embed_content = generate_content()
+        
+        # Check if there is a message in the channel
+        async for message in channel.history(limit=1):
+            previous_message = message
+            break
+        
         if previous_message:
             try:
                 await previous_message.edit(embed=current_embed_content)
@@ -95,18 +104,42 @@ def generate_content():
     data_event = fetch_data_from_api("/api/801/events")
     if data:
         embed = discord.Embed(title=":ringed_planet: Current War Intel :ringed_planet:", color=discord.Color.blue())
-        for i in range(0, len(data_event)):
-            embed.add_field(name=f"Superearth Message {i+1}:", value=f"{data_event[i]['message']['en']}", inline=False)
-            embed.add_field(name=" ", value=" ", inline=False)
+        
+        if data_event:
+            for i in range(0, len(data_event)):
+                if data_event[i]:
+                    if data_event[i]['message']['en'] != "":
+                        embed.add_field(name=f"Superearth Intel:", value=f"{data_event[i]['message']['en']}", inline=False)
+                        embed.add_field(name=" ", value=" ", inline=False)
 
         for i in range(0, len(data.get('planet_status', []))):
             if 100 > data['planet_status'][i]['liberation'] > 0:
+                
+                health = data['planet_status'][i]['health']
+                regen_per_second = data["planet_status"][i]["regen_per_second"]
+                players = data['planet_status'][i]['players']
+                current_health_percentage = (health / data['planet_status'][i]["planet"]["max_health"]) * 100
+                liberation = data['planet_status'][i]['liberation']
+                #print(f"DEBUG: {liberation} {regen_per_second} {data['planet_status'][i]['planet']['name']}")
+                #print(data['planet_status'][i])
+                
+                
                 embed.add_field(name="Planet:", value=f"{validate_war(i)} {data['planet_status'][i]['planet']['name']}", inline=True)
-                embed.add_field(name="Liberation:", value=f"{data['planet_status'][i]['liberation']:.2f}%", inline=True)
-                embed.add_field(name="Players:", value=f"{format_players(data['planet_status'][i]['players'])}", inline=True)
+                embed.add_field(name="Liberation:", value=f"{liberation:.2f}%", inline=True)
+                embed.add_field(name="Players:", value=f"{format_players(players)}", inline=True)
+                embed.add_field(name=" ", value=f" ", inline=True)
+                embed.add_field(name="Health:", value=f"{current_health_percentage:.2f}% = {health}", inline=True)
+                embed.add_field(name="Regeneration/s:", value=f"{regen_per_second:.2f}", inline=True)
+                
+                #embed.add_field(name="Time to Liberate:", value=f"{calculate_time_to_liberate(liberation, regen_per_second)}", inline=True)
+                #embed.add_field(name="Efficiency", value=f"{format_efficiency(calculate_liberation_player_efficiency(health, liberation, players))}", inline=True)
+                
                 embed.add_field(name="", value=" ", inline=False)
+                
+                embed.set_footer(text="Written by Public Democracy Office - P.D.O", icon_url="https://static.wikia.nocookie.net/logopedia/images/0/0e/Helldivers_2_%28Icon%29.png/revision/latest?cb=20230526000227")
+        
 
-        embed.add_field(name="Updated:", value=generate_time_embed(), inline=True)
+        embed.add_field(name=f"Updated: {generate_time_embed()}", value="", inline=True)
         return embed
     else:
         return None
